@@ -1,0 +1,8 @@
+{
+  "name": "Eric's Visual Cortex",
+  "description": "A visual reasoning prototype that analyzes webcam frames every 3 seconds using Gemini Flash.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
