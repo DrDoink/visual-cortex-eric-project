@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useConversation } from '@elevenlabs/react';
 import { LiveFeed, LiveFeedHandle } from './components/LiveFeed';
 import { Terminal } from './components/Terminal';
 import { LogEntry, ProcessingState } from './types';
@@ -32,6 +33,17 @@ export default function App() {
     }]);
   }, []);
 
+  // --- Voice Agent System (Eric) ---
+  const conversation = useConversation({
+    onConnect: () => addLog('Voice Link Established with Eric.', 'success'),
+    onDisconnect: () => addLog('Voice Link Terminated.', 'info'),
+    onError: (e) => addLog(`Voice Error: ${e}`, 'error'),
+    onMessage: (msg: any) => {
+        // Optional: Filter for agent messages if verbose logging is desired
+        // console.log("Voice msg:", msg);
+    }
+  });
+
   // --- Vision Logic (The Eye) ---
 
   const performReasoningStep = useCallback(async () => {
@@ -62,8 +74,18 @@ export default function App() {
         // Visual Change Detected
         addLog(result, 'visual');
         
-        // NOTE: Bridge protocol temporarily suspended as Conversation component
-        // now manages its own isolated session.
+        // 4. BRIDGE PROTOCOL
+        // If the voice agent is active, we push the visual context to it.
+        if (conversation.status === 'connected') {
+            try {
+                // Send the visual observation as context to the agent
+                await conversation.sendContextualUpdate(result);
+                addLog('Context synced to Agent.', 'bridge');
+            } catch (bridgeError) {
+                console.error("Bridge failure:", bridgeError);
+                addLog('Bridge Sync Failed.', 'error');
+            }
+        }
       } 
       
     } catch (error) {
@@ -83,7 +105,7 @@ export default function App() {
     } finally {
       setProcessingState(ProcessingState.IDLE);
     }
-  }, [addLog, processingState]);
+  }, [addLog, processingState, conversation]);
 
   // --- Main Control Loop (The Orchestrator) ---
   
@@ -135,7 +157,8 @@ export default function App() {
   return (
     <div className="min-h-screen bg-neutral-950 text-white flex flex-col md:flex-row overflow-hidden font-sans">
       
-      <Conversation />
+      {/* Voice Agent UI */}
+      <Conversation conversation={conversation} />
 
       {/* Left Panel: Visual Feed */}
       <div className="w-full md:w-1/2 p-4 md:p-6 flex flex-col gap-4 border-r border-gray-800 relative">
@@ -148,7 +171,7 @@ export default function App() {
                 <h1 className="font-bold text-xl tracking-tight text-gray-100">Eric's Visual Cortex</h1>
                 <div className="flex items-center gap-2 text-xs text-gray-500">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    v3.5
+                    v4.0
                     <span className="text-gray-700">|</span>
                     Gemini Flash 2.0
                 </div>

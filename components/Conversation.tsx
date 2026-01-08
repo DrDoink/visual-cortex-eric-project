@@ -1,18 +1,14 @@
-import { useConversation } from '@elevenlabs/react';
-import { Mic, Square, Wifi, AlertCircle, Loader2 } from 'lucide-react';
-import { useState, useCallback, useEffect } from 'react';
+import { Mic, Square, AlertCircle, Loader2 } from 'lucide-react';
+import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const AGENT_ID = 'iJe1uzMwAfkHeAqiCZJc'; // Eric
 
-export function Conversation() {
-  const conversation = useConversation({
-    onConnect: () => console.log('Connected to Eric'),
-    onDisconnect: () => console.log('Disconnected from Eric'),
-    onMessage: (message) => console.log('Message from Eric:', message),
-    onError: (error) => console.error('Error:', error),
-  });
+interface ConversationProps {
+  conversation: any; // Typed as any to match the dynamic return of the ElevenLabs hook
+}
 
+export function Conversation({ conversation }: ConversationProps) {
   const { status, isSpeaking } = conversation;
   const [error, setError] = useState<string | null>(null);
 
@@ -27,7 +23,7 @@ export function Conversation() {
         
         await conversation.startSession({
           agentId: AGENT_ID,
-        } as any);
+        });
       }
     } catch (err: any) {
       console.error('Failed to toggle conversation:', err);
@@ -35,10 +31,6 @@ export function Conversation() {
     }
   }, [conversation, status]);
 
-  // Visualizer bars (simulated for simplicity, or could use conversation.volume if available)
-  // The @elevenlabs/react hook doesn't expose raw volume data easily without custom handling,
-  // so we'll use isSpeaking to drive a simple animation.
-  
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-4">
       
