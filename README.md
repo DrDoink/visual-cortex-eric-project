@@ -17,13 +17,14 @@ A "Passive Bridge" connects these distinct loops. When the Gemini model detects 
     *   `GEMINI_API_KEY` (Google Gemini API Key)
     *   `AGENT_ID` (ElevenLabs Agent ID)
 
-## Technical Milestone: Version 3.3 (Build Stability)
+## Technical Milestone: Version 3.4 (Zero-Latency Stability)
 
 **The Challenge**
-We encountered a critical initialization failure caused by an architecture conflict between browser-native module loading (`importmap`) and the Vite bundler. The application attempted to load dependencies from external CDNs while compiled code expected local bundles, resulting in version mismatches and runtime crashes.
+Previous builds suffered from a race condition during initialization where the application attempted to process video frames before the browser had fully loaded the video metadata. This caused immediate "Division by Zero" or "Empty Payload" errors upon startup. Additionally, the floating UI for the voice agent was maintaining a separate connection state from the main logic bridge.
 
 **The Solution**
-To resolve this, the `importmap` was removed entirely. The project now relies strictly on `vite.config.ts` and `package.json` for deterministic dependency resolution.
+*   **Strict Stream Gating:** The `LiveFeed` component now utilizes `onLoadedMetadata` and `readyState` checks to ensure zero-latency captures only occur when valid pixel data is available.
+*   **Unified State:** The `Conversation` component was refactored to share the single `useConversation` instance from the main `App`, ensuring the visual bridge and the UI controls are perfectly synchronized.
 
 ## Technical Specifications
 
@@ -56,6 +57,9 @@ To resolve this, the `importmap` was removed entirely. The project now relies st
 *   **`services/geminiService.ts`**: Handles interactions with the Gemini API.
 
 ## Changelog
+*   **v3.4 (Stability Milestone):**
+    *   **Startup Fix:** Eliminated startup crash by waiting for video metadata and ready state before allowing snapshot capture.
+    *   **Architecture:** Unified Voice/Visual conversation state management.
 *   **v3.3:**
     *   Removed `importmap` to resolve conflict with Vite bundler.
     *   Fixed `process.env` polyfills for browser runtime.

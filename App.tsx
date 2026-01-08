@@ -5,6 +5,7 @@ import { LogEntry, ProcessingState, ConnectionStatus } from './types';
 import { analyzeFrame } from './services/geminiService';
 import { Zap, Activity, StopCircle, PlayCircle, Eye, Mic, Network, Settings, Key, X, Lock } from 'lucide-react';
 import { useConversation } from '@elevenlabs/react';
+import { Conversation } from './components/Conversation';
 
 // Hard Constraint: 4000ms Latency for Vision Loop
 const CAPTURE_INTERVAL_MS = 4000;
@@ -67,9 +68,9 @@ export default function App() {
       setConnectionStatus(ConnectionStatus.CONNECTING);
       addLog(`Attempting handshake with Agent: ${agentId.slice(0, 8)}...`, 'info');
 
-      // Explicitly request mic permission first
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-
+      // Note: Microphone access is no longer explicitly requested here.
+      // The application focuses on Visual Context injection.
+      
       await conversation.startSession({ agentId } as any);
       
     } catch (error) {
@@ -93,7 +94,8 @@ export default function App() {
     // 1. CAPTURE
     const snapshot = liveFeedRef.current?.getSnapshot();
     if (!snapshot) {
-      addLog("Failed to capture visual frame", 'error');
+      // Stream is initializing or camera is not ready yet. 
+      // Silently return to avoid spamming errors during warmup.
       return;
     }
 
@@ -196,6 +198,8 @@ export default function App() {
   return (
     <div className="min-h-screen bg-neutral-950 text-white flex flex-col md:flex-row overflow-hidden font-sans">
       
+      <Conversation conversation={conversation} agentId={agentId} />
+
       {/* Auth Modal */}
       {showAuthModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
@@ -252,7 +256,7 @@ export default function App() {
                 <h1 className="font-bold text-xl tracking-tight text-gray-100">Eric's Visual Cortex</h1>
                 <div className="flex items-center gap-2 text-xs text-gray-500">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    v3.3
+                    v3.4
                     <span className="text-gray-700">|</span>
                     Gemini Flash 2.0
                 </div>

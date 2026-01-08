@@ -19,12 +19,20 @@ export const LiveFeed = forwardRef<LiveFeedHandle, LiveFeedProps>(({ isActive, o
       if (!videoRef.current || !canvasRef.current) return null;
       
       const video = videoRef.current;
+      
+      // Critical gate: don’t capture until the video has real pixels and dimensions
+      if (video.videoWidth === 0 || video.videoHeight === 0) return null;
+      if (video.readyState < 2) return null; // HAVE_CURRENT_DATA
+
       const canvas = canvasRef.current;
       
-      // Set canvas dimensions to 512px width, maintaining aspect ratio
       const targetWidth = 512;
       const aspectRatio = video.videoHeight / video.videoWidth;
-      const targetHeight = targetWidth * aspectRatio;
+      
+      // Safety check: Prevent infinite height on bad aspect ratio
+      if (!Number.isFinite(aspectRatio)) return null;
+
+      const targetHeight = Math.round(targetWidth * aspectRatio);
 
       if (canvas.width !== targetWidth) canvas.width = targetWidth;
       if (canvas.height !== targetHeight) canvas.height = targetHeight;
@@ -34,8 +42,12 @@ export const LiveFeed = forwardRef<LiveFeedHandle, LiveFeedProps>(({ isActive, o
       
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      // Get base64 data (using jpeg for smaller payload)
-      return canvas.toDataURL('image/jpeg', 0.8); 
+      const url = canvas.toDataURL('image/jpeg', 0.8);
+
+      // Filter out empty data URLs
+      if (!url || url === "data:,") return null;
+      
+      return url; 
     }
   }));
 
@@ -52,10 +64,24 @@ export const LiveFeed = forwardRef<LiveFeedHandle, LiveFeedProps>(({ isActive, o
           } 
         });
         
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          onStreamReady(true);
-        }
+        const video = videoRef.current;
+        if (!video) return;
+
+        video.srcObject = stream;
+        
+        // Only declare "ready" when metadata is loaded AND playback starts
+        const onReady = async () => {
+            try {
+                await video.play();
+            } catch (e) {
+                // Autoplay might fail if not muted, but we set muted={true}
+                console.warn("Video play failed:", e);
+            }
+            // Verify dimensions are valid before signalling ready
+            onStreamReady(video.videoWidth > 0 && video.videoHeight > 0);
+        };
+
+        video.onloadedmetadata = onReady;
       } catch (err) {
         console.error("Error accessing webcam:", err);
         onStreamReady(false);
@@ -65,12 +91,13 @@ export const LiveFeed = forwardRef<LiveFeedHandle, LiveFeedProps>(({ isActive, o
     if (isActive) {
       startCamera();
     } else {
-      if (videoRef.current && videoRef.current.srcObject) {
-        const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+      const video = videoRef.current;
+      if (video && video.srcObject) {
+        const tracks = (video.srcObject as MediaStream).getTracks();
         tracks.forEach(track => track.stop());
-        videoRef.current.srcObject = null;
-        onStreamReady(false);
+        video.srcObject = null;
       }
+      onStreamReady(false);
     }
 
     return () => {
@@ -88,7 +115,6 @@ export const LiveFeed = forwardRef<LiveFeedHandle, LiveFeedProps>(({ isActive, o
       {/* Video Feed */}
       <video
         ref={videoRef}
-        autoPlay
         playsInline
         muted
         className={`w-full h-full object-cover transition-opacity duration-500 ${isActive ? 'opacity-100' : 'opacity-20'}`}
