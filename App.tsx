@@ -4,7 +4,7 @@ import { Terminal } from './components/Terminal';
 import { LogEntry, ProcessingState, ConnectionStatus } from './types';
 import { analyzeFrame } from './services/geminiService';
 import { Zap, Activity, StopCircle, PlayCircle, Eye, Mic, Network } from 'lucide-react';
-import { Conversation } from '@11labs/client';
+import { useConversation } from '@elevenlabs/react';
 
 // Hard Constraint: 4000ms Latency for Vision Loop
 const CAPTURE_INTERVAL_MS = 4000;
@@ -19,7 +19,6 @@ export default function App() {
   const liveFeedRef = useRef<LiveFeedHandle>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSnapshotRef = useRef<string | null>(null);
-  const conversationRef = useRef<any>(null);
 
   // Helper to add logs safely
   const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
@@ -32,6 +31,24 @@ export default function App() {
   }, []);
 
   // --- Voice Agent Management (The Voice) ---
+  
+  const conversation = useConversation({
+    onConnect: () => {
+      setConnectionStatus(ConnectionStatus.CONNECTED);
+      addLog("Voice Agent Connected", 'success');
+    },
+    onDisconnect: () => {
+      setConnectionStatus(ConnectionStatus.DISCONNECTED);
+      addLog("Voice Agent Disconnected", 'info');
+    },
+    onMessage: (message: any) => {
+      // console.log("Message:", message);
+    },
+    onError: (error: any) => {
+      console.error("ElevenLabs Error:", error);
+      addLog(`Voice Error: ${error}`, 'error');
+    }
+  });
 
   const startConversation = useCallback(async () => {
     try {
@@ -45,41 +62,19 @@ export default function App() {
         throw new Error("AGENT_ID is missing in environment variables.");
       }
 
-      const conversation = await Conversation.startSession({
-        agentId, 
-        onModeChange: (mode: any) => {
-            // Can be used to update UI based on 'listening' or 'speaking' states
-        },
-        onError: (error: any) => {
-            console.error("ElevenLabs Error:", error);
-            addLog(`Voice Error: ${error}`, 'error');
-        },
-        onConnect: () => {
-             setConnectionStatus(ConnectionStatus.CONNECTED);
-             addLog("Voice Agent Connected", 'success');
-        },
-        onDisconnect: () => {
-            setConnectionStatus(ConnectionStatus.DISCONNECTED);
-            addLog("Voice Agent Disconnected", 'info');
-        }
-      });
-      
-      conversationRef.current = conversation;
+      await conversation.startSession({ agentId } as any);
       
     } catch (error) {
       console.error("Failed to start conversation:", error);
       setConnectionStatus(ConnectionStatus.DISCONNECTED);
       addLog(`Failed to connect Agent: ${(error as Error).message}`, 'error');
     }
-  }, [addLog]);
+  }, [addLog, conversation]);
 
   const stopConversation = useCallback(async () => {
-      if (conversationRef.current) {
-          await conversationRef.current.endSession();
-          conversationRef.current = null;
-      }
+      await conversation.endSession();
       setConnectionStatus(ConnectionStatus.DISCONNECTED);
-  }, []);
+  }, [conversation]);
 
   // --- Vision & Bridge Logic (The Eye) ---
 
@@ -107,16 +102,15 @@ export default function App() {
       // 3. GATEKEEPING
       if (result.includes("NO_CHANGE")) {
         // Passive Protocol: Do nothing.
-        // We do not spam the logs or the agent with "Nothing changed".
       } else {
         // Visual Change Detected
         addLog(result, 'visual');
 
         // 4. BRIDGE PROTOCOL
-        if (conversationRef.current && connectionStatus === ConnectionStatus.CONNECTED) {
+        if (connectionStatus === ConnectionStatus.CONNECTED) {
             try {
                 // Silently push the visual context to the Agent's "mind"
-                await conversationRef.current.sendContextualUpdate(result);
+                await conversation.sendContextualUpdate(result);
                 addLog(`>> Bridge: Sent context to Agent`, 'bridge');
             } catch (bridgeErr) {
                 console.error("Bridge Error:", bridgeErr);
@@ -142,9 +136,17 @@ export default function App() {
     } finally {
       setProcessingState(ProcessingState.IDLE);
     }
-  }, [addLog, processingState, connectionStatus]);
+  }, [addLog, processingState, connectionStatus, conversation]);
 
   // --- Main Control Loop (The Orchestrator) ---
+  
+  // Ref to hold the latest version of the reasoning function
+  // This prevents the interval useEffect from resetting whenever the function identity changes
+  const reasoningStepRef = useRef(performReasoningStep);
+
+  useEffect(() => {
+    reasoningStepRef.current = performReasoningStep;
+  }, [performReasoningStep]);
 
   const toggleSystem = () => {
     if (isActive) {
@@ -168,10 +170,12 @@ export default function App() {
       addLog(`Vision Loop active. Interval: ${CAPTURE_INTERVAL_MS}ms`, 'success');
       
       // Immediate first tick
-      performReasoningStep(); 
+      reasoningStepRef.current(); 
       
       // Interval tick
-      intervalRef.current = setInterval(performReasoningStep, CAPTURE_INTERVAL_MS);
+      intervalRef.current = setInterval(() => {
+        reasoningStepRef.current();
+      }, CAPTURE_INTERVAL_MS);
     } else {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -182,7 +186,7 @@ export default function App() {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isActive, isStreamReady, performReasoningStep, addLog]);
+  }, [isActive, isStreamReady, addLog]); // Intentionally removed performReasoningStep
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white flex flex-col md:flex-row overflow-hidden">
