@@ -1,35 +1,29 @@
 # Eric's Visual Cortex (Multimodal Prototype)
 
 ## Overview
-**Eric's Visual Cortex** is a Multimodal React application. It acts as the visual reasoning center for an ElevenLabs Conversational Agent. 
+**Eric's Visual Cortex** is a multimodal React application designed to serve as the visual reasoning center for an ElevenLabs Conversational Agent.
 
-The system runs two parallel processes:
-1.  **Vision Loop:** Periodically captures webcam frames, processes them with Google Gemini Flash 2.0, and extracts visual context.
+The system operates two parallel processes:
+1.  **Vision Loop:** Periodically captures frames from the user's webcam, processes them using Google Gemini Flash 2.0 to extract visual context.
 2.  **Voice Loop:** Maintains a real-time conversational session with an ElevenLabs Agent.
 
-A "Passive Bridge" connects the two: when Gemini detects a visual change, it silently pushes the observation into the ElevenLabs agent's context window, allowing the voice agent to "see" and react dynamically.
+A "Passive Bridge" connects these distinct loops. When the Gemini model detects a significant visual change, it silently injects the observation into the ElevenLabs agent's context window. This allows the voice agent to perceive and react to its environment dynamically without explicit verbal prompting.
 
-## ⚠️ Security & Configuration
-**IMPORTANT:** This is a public repository.
-*   **NEVER** hardcode your API Keys.
-*   The application uses `process.env`.
+## Security & Configuration
+**Important:** This is a public repository.
+*   **Do not** hardcode your API Keys.
+*   The application utilizes `process.env` for configuration.
 *   Ensure the following environment variables are set in your `.env` file or deployment environment:
     *   `GEMINI_API_KEY` (Google Gemini API Key)
     *   `AGENT_ID` (ElevenLabs Agent ID)
 
-## 🚨 CRITICAL MILESTONE: The Great Resurrection (v3.3)
+## Technical Milestone: Version 3.3 (Build Stability)
 
-**Status:** SYSTEM ONLINE via **Vite Pure Mode**
+**The Challenge**
+We encountered a critical initialization failure caused by an architecture conflict between browser-native module loading (`importmap`) and the Vite bundler. The application attempted to load dependencies from external CDNs while compiled code expected local bundles, resulting in version mismatches and runtime crashes.
 
-### 📉 The Spiral (What we learned)
-We encountered a severe "White Screen of Death" loop caused by a fundamental architecture conflict. We attempted to fix React version mismatches by toggling versions in an HTML `importmap`, while simultaneously running a Vite build process.
-
-**The Lesson:**
-*   **The Conflict:** `importmap` (Browser-native module loading) vs **Vite** (Bundler).
-*   **The Error:** The browser tried to load dependencies from CDNs (`esm.sh`) while the compiled code expected local bundles. This created a race condition and version mismatch that crashed the runtime before error handlers could load.
-*   **The Fix:** **PURGED** the `importmap`. We now rely 100% on `vite.config.ts` and `package.json` for deterministic dependency resolution.
-
-**"Trust the Bundler."**
+**The Solution**
+To resolve this, the `importmap` was removed entirely. The project now relies strictly on `vite.config.ts` and `package.json` for deterministic dependency resolution.
 
 ## Technical Specifications
 
@@ -46,25 +40,23 @@ We encountered a severe "White Screen of Death" loop caused by a fundamental arc
 
 ### 3. The Bridge Loop
 - **Interval:** 4000ms.
-- **Logic:**
+- **Logic Sequence:**
   1. Capture Frame.
   2. Send to Gemini (Context: Current + Previous Frame).
-  3. If Gemini returns `NO_CHANGE` -> Do nothing.
-  4. If Gemini returns new observation -> Log visual event.
-  5. **IF** Voice Agent is `CONNECTED`:
-     *   Call `sendContextualUpdate` with the observation.
-     *   Log `[BRIDGE]` event.
+  3. If Gemini returns `NO_CHANGE`, no action is taken.
+  4. If Gemini returns a new observation, the visual event is logged.
+  5. If the Voice Agent is `CONNECTED`, `sendContextualUpdate` is called with the observation.
 
 ## Architecture
 
 ### Components
 *   **`App.tsx`**: Orchestrates the dual-loop system (Vision Interval + Voice Session) using the `useConversation` hook.
-*   **`components/LiveFeed.tsx`**: Webcam management and frame extraction.
-*   **`components/Terminal.tsx`**: Displays system logs, including distinct visual observations and bridge events.
-*   **`services/geminiService.ts`**: Handles the Gemini API interaction.
+*   **`components/LiveFeed.tsx`**: Manages webcam access and frame extraction.
+*   **`components/Terminal.tsx`**: Displays system logs, differentiating between visual observations and bridge events.
+*   **`services/geminiService.ts`**: Handles interactions with the Gemini API.
 
 ## Changelog
-*   **v3.3 (The Resurrection):**
+*   **v3.3:**
     *   Removed `importmap` to resolve conflict with Vite bundler.
     *   Fixed `process.env` polyfills for browser runtime.
     *   Stabilized React 18.2.0 dependencies.
@@ -73,7 +65,7 @@ We encountered a severe "White Screen of Death" loop caused by a fundamental arc
     *   Updated build configuration to inject environment variables via Vite.
     *   Refactored `App.tsx` to use `useConversation` hook.
 *   **v3.1:**
-    *   Implemented robust error classification for Gemini API calls (Rate limits, Safety blocks, Network issues, Service Overload).
+    *   Implemented robust error classification for Gemini API calls (Rate limits, Safety blocks, Network issues).
 *   **v3.0 (Multimodal):**
     *   Integrated ElevenLabs SDK.
     *   Implemented "Passive Bridge" for context injection.

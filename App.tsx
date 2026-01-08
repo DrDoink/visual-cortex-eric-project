@@ -3,14 +3,19 @@ import { LiveFeed, LiveFeedHandle } from './components/LiveFeed';
 import { Terminal } from './components/Terminal';
 import { LogEntry, ProcessingState, ConnectionStatus } from './types';
 import { analyzeFrame } from './services/geminiService';
-import { Zap, Activity, StopCircle, PlayCircle, Eye, Mic, Network } from 'lucide-react';
+import { Zap, Activity, StopCircle, PlayCircle, Eye, Mic, Network, Settings, Key, X, Lock } from 'lucide-react';
 import { useConversation } from '@elevenlabs/react';
 
 // Hard Constraint: 4000ms Latency for Vision Loop
 const CAPTURE_INTERVAL_MS = 4000;
 
 export default function App() {
-  const [isActive, setIsActive] = useState(false);
+  // System State
+  const [isActive, setIsActive] = useState(false); // Controls Visual Loop
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [agentId, setAgentId] = useState(process.env.AGENT_ID || '');
+  
+  // Operational State
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [processingState, setProcessingState] = useState<ProcessingState>(ProcessingState.IDLE);
   const [isStreamReady, setIsStreamReady] = useState(false);
@@ -35,45 +40,47 @@ export default function App() {
   const conversation = useConversation({
     onConnect: () => {
       setConnectionStatus(ConnectionStatus.CONNECTED);
-      addLog("Voice Agent Connected", 'success');
+      setShowAuthModal(false);
+      addLog("Voice Uplink Established", 'success');
     },
     onDisconnect: () => {
       setConnectionStatus(ConnectionStatus.DISCONNECTED);
-      addLog("Voice Agent Disconnected", 'info');
+      addLog("Voice Uplink Terminated", 'info');
     },
     onMessage: (message: any) => {
       // console.log("Message:", message);
     },
     onError: (error: any) => {
       console.error("ElevenLabs Error:", error);
+      setConnectionStatus(ConnectionStatus.DISCONNECTED);
       addLog(`Voice Error: ${error}`, 'error');
     }
   });
 
-  const startConversation = useCallback(async () => {
+  const handleConnectVoice = useCallback(async () => {
+    if (!agentId) {
+      addLog("Connection Failed: Missing Agent ID", 'error');
+      return;
+    }
+
     try {
       setConnectionStatus(ConnectionStatus.CONNECTING);
-      // Explicitly request mic permission first to ensure browser doesn't block audio context
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      addLog(`Attempting handshake with Agent: ${agentId.slice(0, 8)}...`, 'info');
 
-      // SECURITY: Access ID from process.env, never hardcoded
-      const agentId = process.env.AGENT_ID;
-      if (!agentId) {
-        throw new Error("AGENT_ID is missing in environment variables.");
-      }
+      // Explicitly request mic permission first
+      await navigator.mediaDevices.getUserMedia({ audio: true });
 
       await conversation.startSession({ agentId } as any);
       
     } catch (error) {
       console.error("Failed to start conversation:", error);
       setConnectionStatus(ConnectionStatus.DISCONNECTED);
-      addLog(`Failed to connect Agent: ${(error as Error).message}`, 'error');
+      addLog(`Connection Failed: ${(error as Error).message}`, 'error');
     }
-  }, [addLog, conversation]);
+  }, [addLog, conversation, agentId]);
 
-  const stopConversation = useCallback(async () => {
+  const disconnectVoice = useCallback(async () => {
       await conversation.endSession();
-      setConnectionStatus(ConnectionStatus.DISCONNECTED);
   }, [conversation]);
 
   // --- Vision & Bridge Logic (The Eye) ---
@@ -111,7 +118,7 @@ export default function App() {
             try {
                 // Silently push the visual context to the Agent's "mind"
                 await conversation.sendContextualUpdate(result);
-                addLog(`>> Bridge: Sent context to Agent`, 'bridge');
+                addLog(`>> Bridge: Context injected to Agent`, 'bridge');
             } catch (bridgeErr) {
                 console.error("Bridge Error:", bridgeErr);
                 addLog("Bridge failed to send context", 'error');
@@ -141,26 +148,24 @@ export default function App() {
   // --- Main Control Loop (The Orchestrator) ---
   
   // Ref to hold the latest version of the reasoning function
-  // This prevents the interval useEffect from resetting whenever the function identity changes
   const reasoningStepRef = useRef(performReasoningStep);
 
   useEffect(() => {
     reasoningStepRef.current = performReasoningStep;
   }, [performReasoningStep]);
 
-  const toggleSystem = () => {
+  const toggleVisualSystem = () => {
     if (isActive) {
       // Stop sequence
       setIsActive(false);
       setProcessingState(ProcessingState.IDLE);
       lastSnapshotRef.current = null;
-      stopConversation();
-      addLog("System deactivated.", 'info');
+      disconnectVoice(); // Safety: kill voice if vision dies
+      addLog("Visual Cortex Deactivated.", 'info');
     } else {
       // Start sequence
       setIsActive(true);
-      startConversation();
-      addLog("Initializing Multimodal System...", 'info');
+      addLog("Initializing Visual Cortex...", 'info');
     }
   };
 
@@ -186,11 +191,56 @@ export default function App() {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isActive, isStreamReady, addLog]); // Intentionally removed performReasoningStep
+  }, [isActive, isStreamReady, addLog]);
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white flex flex-col md:flex-row overflow-hidden">
+    <div className="min-h-screen bg-neutral-950 text-white flex flex-col md:flex-row overflow-hidden font-sans">
       
+      {/* Auth Modal */}
+      {showAuthModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="w-full max-w-md bg-neutral-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden">
+                <div className="bg-neutral-800 p-4 border-b border-gray-700 flex justify-between items-center">
+                    <div className="flex items-center gap-2 text-white">
+                        <Lock className="w-4 h-4 text-emerald-500" />
+                        <span className="font-mono text-sm tracking-wider uppercase">Security Clearance</span>
+                    </div>
+                    <button onClick={() => setShowAuthModal(false)} className="text-gray-400 hover:text-white">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+                <div className="p-6 space-y-4">
+                    <p className="text-gray-400 text-sm">
+                        To establish a neural uplink with the Agent, please verify the Connection ID.
+                    </p>
+                    
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">ElevenLabs Agent ID</label>
+                        <div className="relative">
+                            <Key className="absolute left-3 top-2.5 w-4 h-4 text-gray-500" />
+                            <input 
+                                type="text" 
+                                value={agentId}
+                                onChange={(e) => setAgentId(e.target.value)}
+                                placeholder="Enter Agent ID"
+                                className="w-full bg-black/50 border border-gray-700 rounded p-2 pl-10 text-emerald-400 font-mono text-sm focus:border-emerald-500 focus:outline-none transition-colors"
+                            />
+                        </div>
+                    </div>
+
+                    <button 
+                        onClick={handleConnectVoice}
+                        disabled={!agentId}
+                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded flex items-center justify-center gap-2 transition-all"
+                    >
+                        {connectionStatus === ConnectionStatus.CONNECTING ? 'Handshaking...' : 'Establish Uplink'}
+                        <Network className="w-4 h-4" />
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
       {/* Left Panel: Visual Feed */}
       <div className="w-full md:w-1/2 p-4 md:p-6 flex flex-col gap-4 border-r border-gray-800 relative">
         <header className="flex items-center justify-between mb-2">
@@ -202,32 +252,19 @@ export default function App() {
                 <h1 className="font-bold text-xl tracking-tight text-gray-100">Eric's Visual Cortex</h1>
                 <div className="flex items-center gap-2 text-xs text-gray-500">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    Gemini Flash 2.0
+                    v3.3
                     <span className="text-gray-700">|</span>
-                    Multimodal Bridge
+                    Gemini Flash 2.0
                 </div>
              </div>
           </div>
           
           <button 
-            onClick={toggleSystem}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-medium transition-all duration-200 border ${
-              isActive 
-                ? 'bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20' 
-                : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
-            }`}
+            onClick={() => setShowAuthModal(true)}
+            className="p-2 text-gray-500 hover:text-white transition-colors"
+            title="Connection Settings"
           >
-            {isActive ? (
-                <>
-                    <StopCircle className="w-4 h-4" />
-                    <span>Terminate</span>
-                </>
-            ) : (
-                <>
-                    <PlayCircle className="w-4 h-4" />
-                    <span>Start Session</span>
-                </>
-            )}
+            <Settings className="w-5 h-5" />
           </button>
         </header>
 
@@ -247,52 +284,64 @@ export default function App() {
             )}
         </div>
 
-        {/* System Status Grid */}
-        <div className="grid grid-cols-3 gap-4">
-             {/* Visual Status */}
-             <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-800">
-                <div className="text-gray-500 text-xs uppercase font-bold mb-1 flex items-center gap-2">
-                    <Eye className="w-3 h-3" /> Vision
-                </div>
-                <div className="flex items-center gap-2">
-                    {isActive ? (
-                        <span className="text-emerald-400 font-mono text-sm">WATCHING</span>
-                    ) : (
-                        <span className="text-gray-500 font-mono text-sm">OFFLINE</span>
-                    )}
-                </div>
-             </div>
+        {/* Control Grid */}
+        <div className="grid grid-cols-2 gap-4">
+            {/* Master Power (Vision) */}
+            <button 
+                onClick={toggleVisualSystem}
+                className={`p-4 rounded-lg border flex flex-col items-center justify-center gap-2 transition-all duration-200 ${
+                  isActive 
+                    ? 'bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20' 
+                    : 'bg-gray-800/30 border-gray-700 text-gray-300 hover:bg-gray-800'
+                }`}
+            >
+                {isActive ? <StopCircle className="w-6 h-6" /> : <PlayCircle className="w-6 h-6" />}
+                <span className="text-xs font-bold uppercase tracking-widest">
+                    {isActive ? 'Terminate Visuals' : 'Initialize System'}
+                </span>
+            </button>
 
-             {/* Voice Status */}
-             <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-800">
-                <div className="text-gray-500 text-xs uppercase font-bold mb-1 flex items-center gap-2">
-                    <Mic className="w-3 h-3" /> Voice Agent
-                </div>
-                <div className="flex items-center gap-2">
-                    {connectionStatus === ConnectionStatus.CONNECTED && <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>}
-                    {connectionStatus === ConnectionStatus.CONNECTING && <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>}
-                    {connectionStatus === ConnectionStatus.DISCONNECTED && <span className="w-2 h-2 bg-gray-500 rounded-full"></span>}
-                    <span className={`font-mono text-sm ${
-                        connectionStatus === ConnectionStatus.CONNECTED ? 'text-emerald-400' : 
-                        connectionStatus === ConnectionStatus.CONNECTING ? 'text-yellow-400' : 'text-gray-500'
-                    }`}>
-                        {connectionStatus.toUpperCase()}
-                    </span>
-                </div>
-             </div>
+            {/* Voice Uplink */}
+            <button 
+                onClick={() => connectionStatus === ConnectionStatus.CONNECTED ? disconnectVoice() : setShowAuthModal(true)}
+                disabled={!isActive} // Can't connect voice if system is off
+                className={`p-4 rounded-lg border flex flex-col items-center justify-center gap-2 transition-all duration-200 ${
+                    !isActive ? 'opacity-30 cursor-not-allowed border-gray-800 bg-black' :
+                    connectionStatus === ConnectionStatus.CONNECTED
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-red-900/20 hover:text-red-400 hover:border-red-500' // Hover to disconnect
+                        : 'bg-indigo-600/10 border-indigo-500/30 text-indigo-400 hover:bg-indigo-600/20'
+                }`}
+            >
+                {connectionStatus === ConnectionStatus.CONNECTING ? (
+                    <Activity className="w-6 h-6 animate-spin" />
+                ) : connectionStatus === ConnectionStatus.CONNECTED ? (
+                    <Mic className="w-6 h-6" />
+                ) : (
+                    <Network className="w-6 h-6" />
+                )}
+                
+                <span className="text-xs font-bold uppercase tracking-widest">
+                    {connectionStatus === ConnectionStatus.CONNECTED 
+                        ? 'Voice Online' 
+                        : connectionStatus === ConnectionStatus.CONNECTING 
+                            ? 'Negotiating...' 
+                            : 'Connect Agent'}
+                </span>
+            </button>
+        </div>
 
-             {/* Bridge Status */}
-             <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-800">
-                <div className="text-gray-500 text-xs uppercase font-bold mb-1 flex items-center gap-2">
-                    <Network className="w-3 h-3" /> Bridge
-                </div>
-                <div className="flex items-center gap-2">
-                    <Zap className={`w-3 h-3 ${connectionStatus === ConnectionStatus.CONNECTED ? 'text-yellow-500' : 'text-gray-700'}`} />
-                    <span className="text-gray-300 font-mono text-sm">
-                        {CAPTURE_INTERVAL_MS}ms
-                    </span>
-                </div>
-             </div>
+        {/* System Status Bar */}
+        <div className="bg-black/40 p-3 rounded border border-gray-800 flex justify-between items-center text-xs font-mono">
+            <div className="flex items-center gap-4">
+                <span className={isActive ? "text-emerald-500" : "text-gray-600"}>VISION: {isActive ? 'ACTIVE' : 'OFFLINE'}</span>
+                <span className="text-gray-700">|</span>
+                <span className={connectionStatus === ConnectionStatus.CONNECTED ? "text-indigo-400" : "text-gray-600"}>
+                    VOICE: {connectionStatus.toUpperCase()}
+                </span>
+            </div>
+            <div className="text-gray-500">
+                LATENCY: {CAPTURE_INTERVAL_MS}ms
+            </div>
         </div>
       </div>
 
