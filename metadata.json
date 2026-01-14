@@ -1,6 +1,6 @@
 {
-  "name": "Eric's Visual Cortex",
-  "description": "A visual reasoning prototype that analyzes webcam frames every 3 seconds using Gemini Flash.",
+  "name": "Visual Reasoning Connector (Alpha 0.2)",
+  "description": "Connects Google Gemini vision capabilities to ElevenLabs conversational agents.",
   "requestFramePermissions": [
     "camera",
     "microphone"

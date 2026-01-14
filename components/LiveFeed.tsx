@@ -13,23 +13,17 @@ export const LiveFeed = forwardRef<LiveFeedHandle, LiveFeedProps>(({ isActive, o
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Expose the snapshot method to parent
   useImperativeHandle(ref, () => ({
     getSnapshot: () => {
       if (!videoRef.current || !canvasRef.current) return null;
-      
       const video = videoRef.current;
-      
-      // Critical gate: don’t capture until the video has real pixels and dimensions
       if (video.videoWidth === 0 || video.videoHeight === 0) return null;
-      if (video.readyState < 2) return null; // HAVE_CURRENT_DATA
+      if (video.readyState < 2) return null;
 
       const canvas = canvasRef.current;
-      
       const targetWidth = 512;
       const aspectRatio = video.videoHeight / video.videoWidth;
       
-      // Safety check: Prevent infinite height on bad aspect ratio
       if (!Number.isFinite(aspectRatio)) return null;
 
       const targetHeight = Math.round(targetWidth * aspectRatio);
@@ -41,19 +35,14 @@ export const LiveFeed = forwardRef<LiveFeedHandle, LiveFeedProps>(({ isActive, o
       if (!ctx) return null;
       
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
       const url = canvas.toDataURL('image/jpeg', 0.8);
-
-      // Filter out empty data URLs
       if (!url || url === "data:,") return null;
-      
       return url; 
     }
   }));
 
   useEffect(() => {
     let stream: MediaStream | null = null;
-
     const startCamera = async () => {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ 
@@ -63,24 +52,13 @@ export const LiveFeed = forwardRef<LiveFeedHandle, LiveFeedProps>(({ isActive, o
             facingMode: 'user'
           } 
         });
-        
         const video = videoRef.current;
         if (!video) return;
-
         video.srcObject = stream;
-        
-        // Only declare "ready" when metadata is loaded AND playback starts
         const onReady = async () => {
-            try {
-                await video.play();
-            } catch (e) {
-                // Autoplay might fail if not muted, but we set muted={true}
-                console.warn("Video play failed:", e);
-            }
-            // Verify dimensions are valid before signalling ready
+            try { await video.play(); } catch (e) { console.warn("Video play failed:", e); }
             onStreamReady(video.videoWidth > 0 && video.videoHeight > 0);
         };
-
         video.onloadedmetadata = onReady;
       } catch (err) {
         console.error("Error accessing webcam:", err);
@@ -99,50 +77,75 @@ export const LiveFeed = forwardRef<LiveFeedHandle, LiveFeedProps>(({ isActive, o
       }
       onStreamReady(false);
     }
-
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+      if (stream) stream.getTracks().forEach(track => track.stop());
     };
   }, [isActive, onStreamReady]);
 
   return (
-    <div className="relative w-full h-full bg-gray-900 rounded-lg overflow-hidden border border-gray-800 shadow-xl group">
-      {/* Hidden Canvas for capture */}
+    <div className="relative w-full h-full bg-[#050505] overflow-hidden screen-curve crt-screen border-2 border-[#1a1a1a]">
       <canvas ref={canvasRef} className="hidden" />
       
-      {/* Video Feed */}
+      {/* Moving Scanline Bar */}
+      <div className="scanline-anim"></div>
+
+      {/* Video Feed with RAW processing look */}
       <video
         ref={videoRef}
         playsInline
         muted
-        className={`w-full h-full object-cover transition-opacity duration-500 ${isActive ? 'opacity-100' : 'opacity-20'}`}
+        className={`w-full h-full object-cover transition-opacity duration-300 ${
+            isActive 
+            ? 'opacity-80 filter contrast-[1.2] saturate-[0.8] brightness-[0.9] sepia-[0.1]' 
+            : 'opacity-0'
+        }`}
+        style={{ imageRendering: 'pixelated' }}
       />
       
+      {/* Fallback Noise / "No Signal" State */}
       {!isActive && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <p className="text-gray-500 font-mono text-sm uppercase tracking-widest">Feed Offline</p>
+        <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-[#080808]">
+            <div className="relative">
+                <p className="text-[#333] font-bold text-4xl uppercase tracking-[0.2em] chromatic-text font-serif">
+                    Signal Lost
+                </p>
+                <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center mix-blend-overlay">
+                     <p className="text-red-900 font-bold text-4xl uppercase tracking-[0.2em] blur-sm opacity-50">
+                        Signal Lost
+                    </p>
+                </div>
+            </div>
+          <div className="w-24 h-1 bg-acid-red mt-4 shadow-[0_0_10px_#ff2a2a]"></div>
+          <p className="text-xs text-gray-600 font-mono mt-2 tracking-widest">NO INPUT DETECTED</p>
         </div>
       )}
 
-      {/* Overlay UI */}
-      <div className="absolute top-4 left-4 flex gap-2">
-         <div className={`flex items-center gap-2 px-2 py-1 rounded bg-black/50 backdrop-blur-md border ${isActive ? 'border-red-500/50' : 'border-gray-700'}`}>
-            <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-red-500 animate-pulse' : 'bg-gray-500'}`}></div>
-            <span className="text-xs font-mono text-white/80 uppercase">
-              {isActive ? 'Live Input' : 'Standby'}
+      {/* Overlay UI - The "HUD" */}
+      <div className="absolute top-4 left-4 flex gap-3 z-30">
+         <div className={`px-2 py-0.5 border ${
+            isActive 
+            ? 'bg-acid-red border-acid-red text-black' 
+            : 'bg-transparent border-gray-700 text-gray-700'
+         }`}>
+            <span className="text-xs font-bold uppercase font-mono tracking-widest">
+              {isActive ? 'REC ●' : 'STBY'}
             </span>
          </div>
-         <div className="px-2 py-1 rounded bg-black/50 backdrop-blur-md border border-gray-700">
-            <span className="text-xs font-mono text-gray-400">512px</span>
-         </div>
+         {isActive && (
+            <div className="px-2 py-0.5 border border-white/20 bg-black/50 backdrop-blur-sm text-white/80">
+                <span className="text-xs font-mono">CAM_01</span>
+            </div>
+         )}
       </div>
       
-      {/* Scanline effect */}
-      {isActive && (
-         <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-10 bg-[length:100%_2px,3px_100%]"></div>
-      )}
+      {/* Decorative Crosshairs */}
+      <div className="absolute inset-0 pointer-events-none z-20 opacity-20">
+         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 border border-white"></div>
+         <div className="absolute top-8 right-8 w-4 h-[2px] bg-white"></div>
+         <div className="absolute top-8 right-8 h-4 w-[2px] bg-white"></div>
+         <div className="absolute bottom-8 left-8 w-4 h-[2px] bg-white"></div>
+         <div className="absolute bottom-8 left-8 h-4 w-[2px] bg-white"></div>
+      </div>
     </div>
   );
 });

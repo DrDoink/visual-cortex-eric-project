@@ -3,8 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Eric's Visual Cortex</title>
+    <title>Visual Reasoning Connector (Alpha 0.2)</title>
     
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+
     <!-- Emergency Error Logging -->
     <script>
       // Minimal safety shim
@@ -24,25 +28,150 @@
     </script>
 
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- IMPORT MAP REMOVED: Relying on Vite build process -->
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              mono: ['"Space Mono"', 'monospace'],
+              serif: ['"Crimson Text"', 'serif'],
+            },
+            colors: {
+              acid: {
+                red: '#ff2a2a',
+                black: '#080808',
+                white: '#f0f0f0'
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      :root {
+        --acid-red: #ff2a2a;
+        --scanline-color: rgba(0, 0, 0, 0.5);
+      }
+      body {
+        background-color: #020202;
+        color: #e5e5e5;
+        overflow: hidden;
+      }
+      
+      /* --- CRT & SCREEN EFFECTS --- */
+
+      /* 1. Screen Curvature & Vignette */
+      .screen-curve {
+        position: relative;
+        overflow: hidden;
+        border-radius: 12px;
+        box-shadow: inset 0 0 100px rgba(0,0,0,0.95);
+        perspective: 1000px;
+      }
+      .screen-curve::before {
+        content: " ";
+        display: block;
+        position: absolute;
+        top: 0; left: 0; bottom: 0; right: 0;
+        background: radial-gradient(circle, rgba(0,0,0,0) 55%, rgba(0,0,0,0.6) 100%);
+        z-index: 20;
+        pointer-events: none;
+      }
+
+      /* 2. Scanlines & Rolling Bar */
+      .crt-screen::after {
+        content: " ";
+        display: block;
+        position: absolute;
+        top: 0; left: 0; bottom: 0; right: 0;
+        background: linear-gradient(
+          to bottom,
+          rgba(18, 16, 16, 0) 50%,
+          rgba(0, 0, 0, 0.4) 50%
+        );
+        background-size: 100% 4px;
+        z-index: 21;
+        pointer-events: none;
+      }
+      
+      .scanline-anim {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 6px;
+        background: rgba(255, 255, 255, 0.15);
+        opacity: 0.6;
+        animation: scanline 8s linear infinite;
+        pointer-events: none;
+        z-index: 22;
+        box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+      }
+
+      @keyframes scanline {
+        0% { top: -20%; }
+        100% { top: 120%; }
+      }
+
+      /* 3. Chromatic Aberration / Color Bleed */
+      @keyframes color-bleed-pulse {
+        0% { 
+          text-shadow: 2px 0px 1px rgba(255, 0, 0, 0.5), -2px 0px 1px rgba(0, 255, 255, 0.5);
+        }
+        50% { 
+          text-shadow: 3px 0px 1px rgba(255, 0, 0, 0.7), -3px 0px 1px rgba(0, 255, 255, 0.7);
+        }
+        100% { 
+          text-shadow: 2px 0px 1px rgba(255, 0, 0, 0.5), -2px 0px 1px rgba(0, 255, 255, 0.5);
+        }
+      }
+
+      .chromatic-text {
+        animation: color-bleed-pulse 4s infinite alternate;
+      }
+      
+      .acid-border {
+        border: 2px solid #e5e5e5;
+        box-shadow: 6px 6px 0px var(--acid-red);
+        background: #080808;
+      }
+      
+      .acid-text-shadow {
+        text-shadow: 3px 2px 0px var(--acid-red);
+      }
+
+      .pixelated {
+        image-rendering: pixelated;
+      }
+
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #000; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--acid-red); 
+      }
+    </style>
   <script type="importmap">
 {
   "imports": {
+    "@google/genai": "https://esm.sh/@google/genai@^1.35.0",
     "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
     "vite": "https://esm.sh/vite@^7.3.1",
     "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "@elevenlabs/react": "https://esm.sh/@elevenlabs/react@^0.12.3",
-    "framer-motion": "https://esm.sh/framer-motion@^12.24.10"
+    "framer-motion": "https://esm.sh/framer-motion@^12.26.2",
+    "@elevenlabs/react": "https://esm.sh/@elevenlabs/react@^0.13.0"
   }
 }
 </script>
 </head>
-  <body class="bg-black text-gray-200 antialiased overflow-hidden">
+  <body class="bg-[#020202] text-gray-200 antialiased font-mono">
     <!-- Visible overlay for fatal module load failures -->
     <div id="startup-error" style="position:fixed; top:0; left:0; width:100%; height:100%; background:#0a0a0a; color:#ff4444; z-index:99999; padding:40px; white-space:pre-wrap; display:none; overflow:auto; font-family:monospace; border: 4px solid #ff4444;">
       <h1 style="color: white; margin-bottom: 20px;">SYSTEM BOOT FAILURE</h1>

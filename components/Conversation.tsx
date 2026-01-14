@@ -2,49 +2,64 @@ import { Mic, Square, AlertCircle, Loader2 } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const AGENT_ID = 'iJe1uzMwAfkHeAqiCZJc'; // Eric
-
 interface ConversationProps {
-  conversation: any; // Typed as any to match the dynamic return of the ElevenLabs hook
+  conversation: any; 
+  agentId: string;
 }
 
-export function Conversation({ conversation }: ConversationProps) {
+// Simple pixelated representation of an 'E' or digital waveform
+const PixelLogo = () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8">
+        <rect x="4" y="4" width="4" height="4" fill="currentColor"/>
+        <rect x="8" y="4" width="4" height="4" fill="currentColor"/>
+        <rect x="12" y="4" width="4" height="4" fill="currentColor"/>
+        <rect x="4" y="8" width="4" height="4" fill="currentColor"/>
+        <rect x="4" y="12" width="4" height="4" fill="currentColor"/>
+        <rect x="8" y="12" width="4" height="4" fill="currentColor"/>
+        <rect x="4" y="16" width="4" height="4" fill="currentColor"/>
+        <rect x="4" y="20" width="4" height="4" fill="currentColor"/>
+        <rect x="8" y="20" width="4" height="4" fill="currentColor"/>
+        <rect x="12" y="20" width="4" height="4" fill="currentColor"/>
+        {/* Accent pixel */}
+        <rect x="16" y="8" width="4" height="4" fill="#ff2a2a"/>
+    </svg>
+);
+
+export function Conversation({ conversation, agentId }: ConversationProps) {
   const { status, isSpeaking } = conversation;
   const [error, setError] = useState<string | null>(null);
 
   const toggleConversation = useCallback(async () => {
     setError(null);
+    if (!agentId) {
+      setError("NO_AGENT_ID");
+      return;
+    }
     try {
       if (status === 'connected') {
         await conversation.endSession();
       } else {
-        // Request mic permission explicitly first to fail fast if denied
         await navigator.mediaDevices.getUserMedia({ audio: true });
-        
-        await conversation.startSession({
-          agentId: AGENT_ID,
-        });
+        await conversation.startSession({ agentId: agentId });
       }
     } catch (err: any) {
-      console.error('Failed to toggle conversation:', err);
-      setError(err.message || "Connection failed");
+      setError(err.message || "CONN_FAIL");
     }
-  }, [conversation, status]);
+  }, [conversation, status, agentId]);
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-4">
+    <div className="fixed bottom-8 right-8 z-50 flex flex-col items-end gap-3 font-mono">
       
-      {/* Status / Error Toast */}
+      {/* Toast */}
       <AnimatePresence>
         {error && (
           <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="bg-red-950/90 border border-red-500/50 text-red-200 px-4 py-2 rounded-lg text-xs font-mono flex items-center gap-2 backdrop-blur-md"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            className="bg-black border-2 border-red-500 text-red-500 px-4 py-2 text-xs font-bold uppercase shadow-[4px_4px_0px_#ff2a2a]"
           >
-            <AlertCircle className="w-3 h-3" />
-            {error}
+            ERR: {error}
           </motion.div>
         )}
         
@@ -53,50 +68,46 @@ export function Conversation({ conversation }: ConversationProps) {
              initial={{ opacity: 0, x: 20 }}
              animate={{ opacity: 1, x: 0 }}
              exit={{ opacity: 0, x: 20 }}
-             className="bg-emerald-950/80 border border-emerald-500/30 text-emerald-400 px-4 py-2 rounded-full text-xs font-mono backdrop-blur-md flex items-center gap-2"
+             className="bg-black border border-white text-white px-4 py-2 text-xs font-bold uppercase flex items-center gap-3 shadow-[4px_4px_0px_#ff2a2a]"
            >
-             <span className="relative flex h-2 w-2">
-               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-             </span>
-             LINK ESTABLISHED
+             <div className="w-2 h-2 bg-red-600 animate-pulse rounded-full"></div>
+             VOICE LINK ESTABLISHED
            </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Main Control Orb */}
+      {/* Main Button */}
       <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
         onClick={toggleConversation}
         disabled={status === 'connecting'}
-        className={`relative h-16 w-16 rounded-full flex items-center justify-center shadow-[0_0_40px_-10px_rgba(0,0,0,0.5)] border transition-all duration-300 ${
+        className={`relative w-20 h-20 border-2 flex items-center justify-center transition-all duration-200 ${
           status === 'connected' 
-            ? 'bg-red-500 border-red-400 text-white'
+            ? 'bg-white border-white text-black shadow-[6px_6px_0px_#ff2a2a]'
             : status === 'connecting'
-            ? 'bg-neutral-800 border-neutral-700 text-neutral-400 cursor-not-allowed'
-            : 'bg-white border-white text-black hover:bg-neutral-200'
+            ? 'bg-gray-900 border-gray-700 text-gray-500 cursor-wait'
+            : 'bg-black border-white text-white shadow-[6px_6px_0px_white] hover:bg-gray-900'
         }`}
       >
-        {/* Speaking Ripple Effect */}
         {status === 'connected' && isSpeaking && (
-           <span className="absolute -inset-1 rounded-full border border-red-500/50 animate-ping opacity-50 pointer-events-none"></span>
+             <div className="absolute inset-0 border-2 border-red-500 animate-ping opacity-50"></div>
         )}
 
-        {/* Icon Logic */}
         {status === 'connecting' ? (
           <Loader2 className="w-6 h-6 animate-spin" />
         ) : status === 'connected' ? (
-          <Square className="w-6 h-6 fill-current" />
+          <div className="flex flex-col items-center">
+             <PixelLogo />
+          </div>
         ) : (
           <Mic className="w-6 h-6" />
         )}
       </motion.button>
       
-      {/* Label */}
-      <div className="absolute -bottom-6 left-0 right-0 text-center pointer-events-none">
-        <span className="text-[10px] font-mono text-white/30 uppercase tracking-widest">
-            {status === 'connected' ? 'Agent Active' : 'Voice Link'}
+      <div className="text-center w-20">
+        <span className={`text-[9px] font-bold px-1 tracking-widest ${status === 'connected' ? 'bg-acid-red text-black' : 'bg-black text-white'}`}>
+            {status === 'connected' ? 'ACTIVE' : 'READY'}
         </span>
       </div>
     </div>
