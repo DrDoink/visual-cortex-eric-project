@@ -4,9 +4,8 @@ import { LiveFeed, LiveFeedHandle } from './components/LiveFeed';
 import { Terminal } from './components/Terminal';
 import { LogEntry, ProcessingState } from './types';
 import { analyzeFrame } from './services/geminiService';
-import { Activity, Square, Play, Cpu, Aperture, Disc } from 'lucide-react';
+import { Activity, Square, Play, Cpu, Aperture, Disc, Maximize2, Minimize2 } from 'lucide-react';
 import { Conversation } from './components/Conversation';
-import { KeyEntryModal } from './components/KeyEntryModal';
 
 const CAPTURE_INTERVAL_MS = 4000;
 
@@ -15,26 +14,13 @@ export default function App() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [processingState, setProcessingState] = useState<ProcessingState>(ProcessingState.IDLE);
   const [isStreamReady, setIsStreamReady] = useState(false);
-  const [hasKey, setHasKey] = useState(!!process.env.GEMINI_API_KEY);
+  const [isExpanded, setIsExpanded] = useState(false);
   
   const liveFeedRef = useRef<LiveFeedHandle>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   
   const lastSnapshotRef = useRef<string | null>(null);
   const lastTextDescriptionRef = useRef<string | null>(null);
-
-  useEffect(() => {
-     // Check for keys in local storage if not in env
-     if (!process.env.GEMINI_API_KEY) {
-        const stored = localStorage.getItem('GEMINI_API_KEY');
-        if (stored) {
-            // In a real app we'd inject this properly, here we just assume it might be available globally or set in KeyEntry
-            setHasKey(true);
-        } else {
-            setHasKey(false);
-        }
-     }
-  }, []);
 
   const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
     setLogs(prev => [...prev, {
@@ -135,15 +121,6 @@ export default function App() {
   return (
     <div className="h-screen w-screen bg-ikea-base text-ikea-text flex flex-col font-sans overflow-hidden">
       
-      {!hasKey && (
-          <KeyEntryModal 
-            onConfirm={(key, agent) => {
-                // simple shim to refresh state
-                window.location.reload(); 
-            }} 
-          />
-      )}
-
       <Conversation conversation={conversation} agentId={process.env.AGENT_ID || localStorage.getItem('AGENT_ID') || ''} />
 
       {/* FIXED HEADER */}
@@ -183,10 +160,11 @@ export default function App() {
       </header>
 
       {/* MAIN CONTENT AREA - SCROLLABLE */}
-      <main className="flex-1 flex flex-col md:flex-row gap-8 p-8 min-h-0 overflow-hidden">
+      <main className="flex-1 flex flex-col md:flex-row gap-8 p-8 min-h-0 overflow-hidden transition-all duration-500">
           
           {/* LEFT: VIDEO FEED */}
-          <div className="w-full md:w-1/2 flex flex-col gap-4 min-h-0">
+          {/* We hide this column via CSS to prevent unmounting (which stops the camera) */}
+          <div className={`flex flex-col gap-4 min-h-0 transition-all duration-300 ease-in-out ${isExpanded ? 'hidden' : 'w-full md:w-1/2'}`}>
              <div className="flex items-center justify-between px-2">
                  <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
                     <Disc className="w-4 h-4" /> Optical Input
@@ -221,12 +199,21 @@ export default function App() {
           </div>
 
           {/* RIGHT: CONSOLE */}
-          <div className="w-full md:w-1/2 flex flex-col gap-4 min-h-0">
+          <div className={`flex flex-col gap-4 min-h-0 transition-all duration-300 ease-in-out ${isExpanded ? 'w-full' : 'w-full md:w-1/2'}`}>
               <div className="flex items-center justify-between px-2">
                  <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
                     <Cpu className="w-4 h-4" /> Logic Stream
                  </h2>
-                 <span className="px-2 py-1 rounded-md bg-gray-200 text-[10px] font-bold text-gray-500">{logs.length} EVENTS</span>
+                 <div className="flex items-center gap-3">
+                    <span className="px-2 py-1 rounded-md bg-gray-200 text-[10px] font-bold text-gray-500">{logs.length} EVENTS</span>
+                    <button 
+                        onClick={() => setIsExpanded(!isExpanded)}
+                        className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-300 text-gray-500 transition-colors"
+                        title={isExpanded ? "Minimize" : "Maximize"}
+                    >
+                        {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                    </button>
+                 </div>
              </div>
 
              <div className="flex-1 neu-pressed p-6 rounded-[24px] relative overflow-hidden flex flex-col">

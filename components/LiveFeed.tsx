@@ -113,9 +113,9 @@ export const LiveFeed = forwardRef<LiveFeedHandle, LiveFeedProps>(({ isActive, o
 
       {/* Minimal HUD */}
       {isActive && (
-          <div className="absolute top-4 left-4 flex gap-2 z-30">
-            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_red]"></div>
-            <span className="text-[10px] font-bold text-white/80 tracking-widest shadow-black drop-shadow-md">LIVE FEED</span>
+          <div className="absolute top-4 left-4 flex gap-2 z-30 items-center">
+            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]"></div>
+            <span className="text-[10px] font-bold tracking-widest live-glow-text">LIVE FEED</span>
           </div>
       )}
     </div>

@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
 
     <!-- Emergency Error Logging -->
     <script>
@@ -33,6 +34,7 @@
           extend: {
             fontFamily: {
               sans: ['"DM Sans"', 'sans-serif'],
+              mono: ['"VT323"', 'monospace'],
             },
             colors: {
               ikea: {
@@ -119,6 +121,23 @@
       @keyframes scanline {
         0% { top: -20%; }
         100% { top: 120%; }
+      }
+
+      /* Live Feed Red Glow */
+      @keyframes soft-red-pulse {
+        0%, 100% { 
+          text-shadow: 0 0 2px rgba(239, 68, 68, 0.4);
+          opacity: 0.8;
+        }
+        50% { 
+          text-shadow: 0 0 8px rgba(239, 68, 68, 0.8), 0 0 12px rgba(239, 68, 68, 0.4);
+          opacity: 1;
+        }
+      }
+
+      .live-glow-text {
+        color: #ef4444;
+        animation: soft-red-pulse 3s ease-in-out infinite;
       }
 
       /* Custom Scrollbar */

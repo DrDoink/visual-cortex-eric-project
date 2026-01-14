@@ -10,12 +10,20 @@ The system operates two parallel processes:
 A "Passive Bridge" connects these distinct loops. When the Gemini model detects a significant visual change, it silently injects the observation into the ElevenLabs agent's context window. This allows the voice agent to perceive and react to its environment dynamically without explicit verbal prompting.
 
 ## Security & Configuration
-**Important:** This is a client-side application.
-*   **Do not** hardcode your API Keys in the source code.
-*   The application utilizes `process.env` for configuration.
-*   Ensure the following environment variables are set in your `.env` file or deployment environment:
-    *   `GEMINI_API_KEY` (Google Gemini API Key)
-    *   `AGENT_ID` (ElevenLabs Agent ID)
+
+### Runtime Configuration (New)
+The application now supports **Client-Side Configuration** via a UI modal. If environment variables are not detected during startup, the application will automatically prompt you to enter:
+1.  **Google Gemini API Key**
+2.  **ElevenLabs Agent ID**
+
+These credentials are saved to your browser's `localStorage` to persist across reloads.
+
+### Environment Variables (Development)
+For development or fixed deployments, you can still pre-configure the application using environment variables or a `.env` file:
+*   `GEMINI_API_KEY`: Your Google Gemini API Key.
+*   `AGENT_ID`: Your ElevenLabs Agent ID.
+
+**Security Note:** This is a client-side application. API keys stored in `localStorage` or injected via build tools are visible to the user. Do not use production keys with high quotas in public-facing deployments without a backend proxy.
 
 ## Technical Specifications (Alpha 0.2)
 
@@ -45,12 +53,15 @@ A "Passive Bridge" connects these distinct loops. When the Gemini model detects 
 *   **`App.tsx`**: Orchestrates the dual-loop system (Vision Interval + Voice Session).
 *   **`components/LiveFeed.tsx`**: Manages webcam access, frame extraction, and strict ready-state gating.
 *   **`components/Terminal.tsx`**: Displays system logs, differentiating between visual observations and bridge events.
+*   **`components/KeyEntryModal.tsx`**: Provides a secure-looking UI for users to input credentials if environment variables are missing.
+*   **`components/Conversation.tsx`**: Handles the ElevenLabs connection toggle and status display.
 *   **`services/geminiService.ts`**: Handles interactions with the Gemini API.
 
 ## Changelog
 *   **Alpha 0.2:**
+    *   **UI Overhaul**: Switched to a "Neumorphic Ikea" aesthetic with soft greys and rounded corners.
+    *   **Runtime Auth**: Added `KeyEntryModal` for easy testing without build steps.
     *   Renamed project to "Visual Reasoning Connector".
-    *   Cleaned repository structure.
     *   Updated Gemini prompt for more vivid visual descriptions.
 *   **Alpha 0.1 (Formerly v3.4):**
     *   Stability Milestone: Zero-latency startup fix.
