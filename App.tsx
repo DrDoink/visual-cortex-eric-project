@@ -4,29 +4,38 @@ import { LiveFeed, LiveFeedHandle } from './components/LiveFeed';
 import { Terminal } from './components/Terminal';
 import { LogEntry, ProcessingState } from './types';
 import { analyzeFrame } from './services/geminiService';
-import { Activity, Square, Play, Eye, Settings, Cpu } from 'lucide-react';
+import { Activity, Square, Play, Cpu, Aperture, Disc } from 'lucide-react';
 import { Conversation } from './components/Conversation';
+import { KeyEntryModal } from './components/KeyEntryModal';
 
-// Hard Constraint: 4000ms Latency for Vision Loop
 const CAPTURE_INTERVAL_MS = 4000;
 
 export default function App() {
-  // System State
-  const [isActive, setIsActive] = useState(false); // Controls Visual Loop
-  
-  // Operational State
+  const [isActive, setIsActive] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [processingState, setProcessingState] = useState<ProcessingState>(ProcessingState.IDLE);
   const [isStreamReady, setIsStreamReady] = useState(false);
+  const [hasKey, setHasKey] = useState(!!process.env.GEMINI_API_KEY);
   
   const liveFeedRef = useRef<LiveFeedHandle>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   
-  // State Refs for Logic Loop
   const lastSnapshotRef = useRef<string | null>(null);
   const lastTextDescriptionRef = useRef<string | null>(null);
 
-  // Helper to add logs safely
+  useEffect(() => {
+     // Check for keys in local storage if not in env
+     if (!process.env.GEMINI_API_KEY) {
+        const stored = localStorage.getItem('GEMINI_API_KEY');
+        if (stored) {
+            // In a real app we'd inject this properly, here we just assume it might be available globally or set in KeyEntry
+            setHasKey(true);
+        } else {
+            setHasKey(false);
+        }
+     }
+  }, []);
+
   const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
     setLogs(prev => [...prev, {
       id: crypto.randomUUID(),
@@ -36,54 +45,39 @@ export default function App() {
     }]);
   }, []);
 
-  // --- Voice Agent System (ElevenLabs) ---
   const conversation = useConversation({
     onConnect: () => addLog('Voice Link Established.', 'success'),
     onDisconnect: () => addLog('Voice Link Terminated.', 'info'),
     onError: (e) => addLog(`Voice Error: ${e}`, 'error'),
-    onMessage: (msg: any) => {
-       // optional log
-    }
+    onMessage: (msg: any) => {}
   });
 
-  // --- Vision Logic (Gemini) ---
-
   const performReasoningStep = useCallback(async () => {
-    // Prevent overlapping logic
     if (processingState !== ProcessingState.IDLE && processingState !== ProcessingState.ANALYZING) return;
     if (processingState === ProcessingState.ANALYZING) return;
 
-    // 1. CAPTURE
     const snapshot = liveFeedRef.current?.getSnapshot();
     if (!snapshot) return;
 
     setProcessingState(ProcessingState.ANALYZING);
     
     try {
-      // 2. INFERENCE (Context: Previous Frame + Last Textual Description)
       const result = await analyzeFrame(
         snapshot, 
         lastSnapshotRef.current, 
         lastTextDescriptionRef.current
       );
       
-      // Update visual context
       lastSnapshotRef.current = snapshot;
 
-      // 3. GATEKEEPING (Deduplication)
       if (result.includes("NO_CHANGE") || result.trim().length === 0) {
-        // Passive Protocol: Do nothing.
+        // no-op
       } else {
-        // Visual Change Detected
-        // Update textual context so next prompt knows what was just said
         lastTextDescriptionRef.current = result;
-        
         addLog(result, 'visual');
         
-        // 4. BRIDGE PROTOCOL
         if (conversation.status === 'connected') {
             try {
-                // Send the visual observation as context to the ElevenLabs agent
                 await conversation.sendContextualUpdate(result);
                 addLog('Context synced to Agent.', 'bridge');
             } catch (bridgeError) {
@@ -100,8 +94,6 @@ export default function App() {
       setProcessingState(ProcessingState.IDLE);
     }
   }, [addLog, processingState, conversation]);
-
-  // --- Main Control Loop ---
   
   const reasoningStepRef = useRef(performReasoningStep);
 
@@ -140,96 +132,115 @@ export default function App() {
     };
   }, [isActive, isStreamReady, addLog]);
 
-  // --- Render ---
-
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex flex-col md:flex-row overflow-hidden p-3 gap-3">
+    <div className="h-screen w-screen bg-ikea-base text-ikea-text flex flex-col font-sans overflow-hidden">
       
-      <Conversation conversation={conversation} agentId={process.env.AGENT_ID || ''} />
+      {!hasKey && (
+          <KeyEntryModal 
+            onConfirm={(key, agent) => {
+                // simple shim to refresh state
+                window.location.reload(); 
+            }} 
+          />
+      )}
 
-      {/* Left Panel: Visual Feed */}
-      <div className="w-full md:w-1/2 flex flex-col gap-3 relative">
-        {/* Header Block */}
-        <header className="acid-border p-5 flex justify-between items-start bg-black">
-          <div>
-            <div className="flex items-baseline gap-3 mb-1">
-                 <h1 className="text-4xl font-serif font-bold tracking-tighter italic acid-text-shadow leading-none text-white">
-                    Visual Connector
-                 </h1>
-            </div>
-            <div className="flex items-center gap-3 text-[10px] font-mono font-bold tracking-widest text-gray-400 uppercase mt-2">
-                <span className="text-acid-red">System.v0.2</span>
-                <span className="text-gray-600">/</span>
-                <span>Gemini Flash</span>
-                <span className="text-gray-600">/</span>
-                <span>ElevenLabs</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 pt-1">
-            <Cpu className="w-6 h-6 text-gray-600" />
-          </div>
-        </header>
+      <Conversation conversation={conversation} agentId={process.env.AGENT_ID || localStorage.getItem('AGENT_ID') || ''} />
 
-        {/* Viewport Block */}
-        <div className="flex-1 relative acid-border p-1 bg-[#0a0a0a] min-h-[400px]">
-            <LiveFeed 
-                ref={liveFeedRef} 
-                isActive={isActive} 
-                onStreamReady={setIsStreamReady} 
-            />
-            
-            {/* Overlay Status Badge */}
-            <div className="absolute bottom-4 right-4 z-20">
-                {isActive && processingState === ProcessingState.ANALYZING ? (
-                    <div className="flex items-center gap-2 px-3 py-1 bg-acid-red text-black text-xs font-bold uppercase animate-pulse border border-black shadow-[2px_2px_0px_black]">
-                        <Activity className="w-3 h-3" />
-                        Analyzing Input
+      {/* FIXED HEADER */}
+      <header className="flex-none h-20 px-8 flex items-center justify-between z-20 shadow-sm relative">
+          <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl neu-convex flex items-center justify-center text-ikea-sub">
+                 <Aperture className="w-6 h-6" />
+              </div>
+              <div>
+                  <h1 className="text-xl font-bold tracking-tight text-gray-800">Visual Connector</h1>
+                  <div className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-widest">
+                      <span>Mk.II</span>
+                      <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
+                      <span>Neumorphic</span>
+                  </div>
+              </div>
+          </div>
+
+          <div className="flex items-center gap-6">
+               <div className="flex flex-col items-end">
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-gray-400">System Status</span>
+                    <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-gray-400'}`}></span>
+                        <span className="text-sm font-bold text-gray-700">{isActive ? 'ONLINE' : 'STANDBY'}</span>
                     </div>
-                ) : null}
-            </div>
-        </div>
+               </div>
+               
+               <button 
+                  onClick={toggleVisualSystem}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 neu-convex neu-btn ${
+                      isActive ? 'text-green-600' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+               >
+                  {isActive ? <Square className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-1" />}
+               </button>
+          </div>
+      </header>
 
-        {/* Controls Block */}
-        <div className="acid-border p-4 bg-black flex items-center justify-between">
-            <div className="flex flex-col">
-                <span className="text-[10px] text-gray-500 font-mono uppercase tracking-widest mb-1">Cortex Status</span>
-                <span className={`text-2xl font-serif italic font-bold ${isActive ? 'text-white chromatic-text' : 'text-gray-700'}`}>
-                    {isActive ? 'ONLINE' : 'OFFLINE'}
-                </span>
-            </div>
-
-            <button 
-                onClick={toggleVisualSystem}
-                className={`group px-8 py-3 font-mono font-bold uppercase tracking-widest text-xs border-2 transition-all relative overflow-hidden ${
-                  isActive 
-                    ? 'bg-acid-red border-acid-red text-black hover:brightness-110' 
-                    : 'bg-transparent border-white text-white hover:bg-white hover:text-black'
-                }`}
-            >
-                <span className="relative z-10 flex items-center gap-3">
-                    {isActive ? <Square className="w-3 h-3 fill-current" /> : <Play className="w-3 h-3 fill-current" />}
-                    {isActive ? 'Terminate' : 'Initialize'}
-                </span>
-            </button>
-        </div>
-      </div>
-
-      {/* Right Panel: Logic Console */}
-      <div className="w-full md:w-1/2 acid-border bg-black flex flex-col p-2 relative">
-        <div className="mb-2 px-3 pt-3 flex items-center justify-between border-b-2 border-[#222] pb-3">
-             <h2 className="text-xl font-serif font-bold italic text-white tracking-tight">
-                Process Log
-             </h2>
-             <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-acid-red rounded-full animate-pulse"></div>
-                <span className="text-xs font-mono text-gray-500">{logs.length} EVENTS</span>
+      {/* MAIN CONTENT AREA - SCROLLABLE */}
+      <main className="flex-1 flex flex-col md:flex-row gap-8 p-8 min-h-0 overflow-hidden">
+          
+          {/* LEFT: VIDEO FEED */}
+          <div className="w-full md:w-1/2 flex flex-col gap-4 min-h-0">
+             <div className="flex items-center justify-between px-2">
+                 <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                    <Disc className="w-4 h-4" /> Optical Input
+                 </h2>
+                 {isActive && processingState === ProcessingState.ANALYZING && (
+                     <span className="text-xs font-bold text-gray-400 animate-pulse">ANALYZING...</span>
+                 )}
              </div>
-        </div>
-        <div className="flex-1 overflow-hidden relative p-1">
-            <Terminal logs={logs} />
-        </div>
-      </div>
+             
+             {/* The Monitor */}
+             <div className="flex-1 neu-pressed p-4 relative overflow-hidden rounded-[24px]">
+                 <div className="w-full h-full rounded-[16px] overflow-hidden bg-black/5 relative shadow-inner">
+                    <LiveFeed 
+                        ref={liveFeedRef} 
+                        isActive={isActive} 
+                        onStreamReady={setIsStreamReady} 
+                    />
+                 </div>
+             </div>
+             
+             {/* Controls / Info */}
+             <div className="h-24 neu-flat p-6 flex items-center justify-between rounded-[20px]">
+                 <div className="space-y-1">
+                     <p className="text-xs text-gray-400 font-bold uppercase">Active Sensor</p>
+                     <p className="text-sm font-medium text-gray-700">Generic Webcam Device</p>
+                 </div>
+                 <div className="space-y-1 text-right">
+                     <p className="text-xs text-gray-400 font-bold uppercase">Latency</p>
+                     <p className="text-sm font-medium text-gray-700">{isActive ? '~4000ms' : '--'}</p>
+                 </div>
+             </div>
+          </div>
 
+          {/* RIGHT: CONSOLE */}
+          <div className="w-full md:w-1/2 flex flex-col gap-4 min-h-0">
+              <div className="flex items-center justify-between px-2">
+                 <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                    <Cpu className="w-4 h-4" /> Logic Stream
+                 </h2>
+                 <span className="px-2 py-1 rounded-md bg-gray-200 text-[10px] font-bold text-gray-500">{logs.length} EVENTS</span>
+             </div>
+
+             <div className="flex-1 neu-pressed p-6 rounded-[24px] relative overflow-hidden flex flex-col">
+                  {/* Internal shading for depth */}
+                  <div className="absolute inset-0 pointer-events-none shadow-[inset_0_2px_10px_rgba(0,0,0,0.05)] rounded-[24px]"></div>
+                  
+                  {/* Scrollable Container */}
+                  <div className="flex-1 min-h-0 relative">
+                      <Terminal logs={logs} />
+                  </div>
+             </div>
+          </div>
+
+      </main>
     </div>
   );
 }

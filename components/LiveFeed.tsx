@@ -83,69 +83,41 @@ export const LiveFeed = forwardRef<LiveFeedHandle, LiveFeedProps>(({ isActive, o
   }, [isActive, onStreamReady]);
 
   return (
-    <div className="relative w-full h-full bg-[#050505] overflow-hidden screen-curve crt-screen border-2 border-[#1a1a1a]">
+    <div className="relative w-full h-full bg-[#1a1a1a] overflow-hidden crt-overlay">
       <canvas ref={canvasRef} className="hidden" />
       
       {/* Moving Scanline Bar */}
       <div className="scanline-anim"></div>
 
-      {/* Video Feed with RAW processing look */}
+      {/* Video Feed */}
       <video
         ref={videoRef}
         playsInline
         muted
-        className={`w-full h-full object-cover transition-opacity duration-300 ${
+        className={`w-full h-full object-cover transition-opacity duration-500 ${
             isActive 
-            ? 'opacity-80 filter contrast-[1.2] saturate-[0.8] brightness-[0.9] sepia-[0.1]' 
+            ? 'opacity-90 grayscale-[0.2] contrast-[1.05]' 
             : 'opacity-0'
         }`}
-        style={{ imageRendering: 'pixelated' }}
       />
       
-      {/* Fallback Noise / "No Signal" State */}
+      {/* Idle State */}
       {!isActive && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-[#080808]">
-            <div className="relative">
-                <p className="text-[#333] font-bold text-4xl uppercase tracking-[0.2em] chromatic-text font-serif">
-                    Signal Lost
-                </p>
-                <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center mix-blend-overlay">
-                     <p className="text-red-900 font-bold text-4xl uppercase tracking-[0.2em] blur-sm opacity-50">
-                        Signal Lost
-                    </p>
-                </div>
-            </div>
-          <div className="w-24 h-1 bg-acid-red mt-4 shadow-[0_0_10px_#ff2a2a]"></div>
-          <p className="text-xs text-gray-600 font-mono mt-2 tracking-widest">NO INPUT DETECTED</p>
+        <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-[#e0e0e0]">
+             <div className="w-16 h-16 rounded-full border-4 border-gray-300 flex items-center justify-center mb-4">
+                <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+             </div>
+             <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">Signal Offline</p>
         </div>
       )}
 
-      {/* Overlay UI - The "HUD" */}
-      <div className="absolute top-4 left-4 flex gap-3 z-30">
-         <div className={`px-2 py-0.5 border ${
-            isActive 
-            ? 'bg-acid-red border-acid-red text-black' 
-            : 'bg-transparent border-gray-700 text-gray-700'
-         }`}>
-            <span className="text-xs font-bold uppercase font-mono tracking-widest">
-              {isActive ? 'REC ●' : 'STBY'}
-            </span>
-         </div>
-         {isActive && (
-            <div className="px-2 py-0.5 border border-white/20 bg-black/50 backdrop-blur-sm text-white/80">
-                <span className="text-xs font-mono">CAM_01</span>
-            </div>
-         )}
-      </div>
-      
-      {/* Decorative Crosshairs */}
-      <div className="absolute inset-0 pointer-events-none z-20 opacity-20">
-         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 border border-white"></div>
-         <div className="absolute top-8 right-8 w-4 h-[2px] bg-white"></div>
-         <div className="absolute top-8 right-8 h-4 w-[2px] bg-white"></div>
-         <div className="absolute bottom-8 left-8 w-4 h-[2px] bg-white"></div>
-         <div className="absolute bottom-8 left-8 h-4 w-[2px] bg-white"></div>
-      </div>
+      {/* Minimal HUD */}
+      {isActive && (
+          <div className="absolute top-4 left-4 flex gap-2 z-30">
+            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_red]"></div>
+            <span className="text-[10px] font-bold text-white/80 tracking-widest shadow-black drop-shadow-md">LIVE FEED</span>
+          </div>
+      )}
     </div>
   );
 });

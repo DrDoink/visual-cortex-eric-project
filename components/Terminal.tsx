@@ -22,57 +22,58 @@ export const Terminal: React.FC<TerminalProps> = ({ logs }) => {
   };
 
   return (
-    <div className="h-full bg-black font-mono text-sm p-2 relative overflow-hidden">
-      {/* Scanline overlay specific to terminal */}
-      <div className="absolute inset-0 pointer-events-none opacity-10 bg-[linear-gradient(rgba(255,255,255,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.1)_1px,transparent_1px)] bg-[size:16px_16px]"></div>
-
-      <div className="h-full overflow-y-auto pr-2 relative z-10 scrollbar-hide">
-        {logs.length === 0 && (
-          <div className="text-gray-700 mt-4 uppercase">
-            > System Ready...
-            <br/>
-            > Awaiting Visual Input...
-          </div>
-        )}
-        
+    <div className="h-full overflow-y-auto pr-4 font-sans text-sm pb-4">
+      {logs.length === 0 && (
+        <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-2 opacity-50">
+           <div className="w-16 h-1 bg-gray-300 rounded-full"></div>
+           <p className="text-xs uppercase tracking-widest font-bold">System Idle</p>
+        </div>
+      )}
+      
+      <div className="space-y-4">
         {logs.map((log) => (
-          <div key={log.id} className="mb-2 font-mono break-words leading-tight">
-            <span className="text-gray-600 mr-2">[{formatTime(log.timestamp)}]</span>
+          <div key={log.id} className="group flex gap-4 text-sm animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <span className="flex-none text-[10px] font-bold text-gray-400 mt-1 select-none w-12 text-right">
+                {formatTime(log.timestamp)}
+            </span>
             
-            {log.type === 'visual' && (
-                <span className="text-white">
-                    <span className="text-red-500 font-bold mr-1">{'>'}</span>
-                    {log.message}
-                </span>
-            )}
+            <div className="flex-1 space-y-1">
+                {log.type === 'visual' && (
+                    <div className="text-gray-800 font-medium bg-white/50 p-3 rounded-tr-xl rounded-bl-xl rounded-br-xl shadow-sm border border-white">
+                        {log.message}
+                    </div>
+                )}
 
-            {log.type === 'bridge' && (
-                <span className="text-gray-400 italic">
-                     {'>>'} SYNC_AGENT: {log.message}
-                </span>
-            )}
+                {log.type === 'bridge' && (
+                    <div className="flex items-center gap-2 text-xs text-gray-500 italic pl-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-300"></span>
+                        Synced with Voice Agent
+                    </div>
+                )}
 
-            {log.type === 'error' && (
-                <span className="bg-red-900/30 text-red-500 px-1 border border-red-900/50">
-                    ERR: {log.message}
-                </span>
-            )}
+                {log.type === 'error' && (
+                    <div className="text-red-500 bg-red-50 p-2 rounded-lg text-xs font-bold border border-red-100">
+                        Error: {log.message}
+                    </div>
+                )}
 
-            {log.type === 'success' && (
-                <span className="text-white uppercase font-bold">
-                    {log.message}
-                </span>
-            )}
-            
-            {log.type === 'info' && (
-                <span className="text-gray-500">
-                    {log.message}
-                </span>
-            )}
+                {log.type === 'success' && (
+                    <div className="text-green-600 text-xs font-bold uppercase tracking-wide flex items-center gap-2">
+                        <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+                        {log.message}
+                    </div>
+                )}
+                
+                {log.type === 'info' && (
+                    <div className="text-gray-400 text-xs pl-1">
+                        {log.message}
+                    </div>
+                )}
+            </div>
           </div>
         ))}
-        <div ref={bottomRef} />
       </div>
+      <div ref={bottomRef} className="h-4" />
     </div>
   );
 };

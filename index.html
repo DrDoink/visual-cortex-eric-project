@@ -7,11 +7,10 @@
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
 
     <!-- Emergency Error Logging -->
     <script>
-      // Minimal safety shim
       window.process = window.process || { env: { NODE_ENV: 'production' } };
       
       const logToStartup = (msg) => {
@@ -33,14 +32,15 @@
         theme: {
           extend: {
             fontFamily: {
-              mono: ['"Space Mono"', 'monospace'],
-              serif: ['"Crimson Text"', 'serif'],
+              sans: ['"DM Sans"', 'sans-serif'],
             },
             colors: {
-              acid: {
-                red: '#ff2a2a',
-                black: '#080808',
-                white: '#f0f0f0'
+              ikea: {
+                base: '#e0e0e0',
+                dark: '#bebebe',
+                light: '#ffffff',
+                text: '#333333',
+                sub: '#666666'
               }
             }
           }
@@ -49,48 +49,57 @@
     </script>
     <style>
       :root {
-        --acid-red: #ff2a2a;
-        --scanline-color: rgba(0, 0, 0, 0.5);
+        --bg-color: #e0e0e0;
+        --shadow-light: #ffffff;
+        --shadow-dark: #bebebe;
+        --text-main: #333333;
       }
       body {
-        background-color: #020202;
-        color: #e5e5e5;
+        background-color: var(--bg-color);
+        color: var(--text-main);
         overflow: hidden;
+        font-family: 'DM Sans', sans-serif;
       }
       
-      /* --- CRT & SCREEN EFFECTS --- */
+      /* --- Neumorphism Utilities --- */
+      .neu-flat {
+        background: var(--bg-color);
+        box-shadow: 5px 5px 10px var(--shadow-dark), -5px -5px 10px var(--shadow-light);
+        border-radius: 16px;
+      }
 
-      /* 1. Screen Curvature & Vignette */
-      .screen-curve {
+      .neu-pressed {
+        background: var(--bg-color);
+        box-shadow: inset 5px 5px 10px var(--shadow-dark), inset -5px -5px 10px var(--shadow-light);
+        border-radius: 16px;
+      }
+
+      .neu-convex {
+        background: linear-gradient(145deg, #f0f0f0, #cacaca);
+        box-shadow: 6px 6px 12px var(--shadow-dark), -6px -6px 12px var(--shadow-light);
+        border-radius: 16px;
+      }
+
+      .neu-btn {
+        transition: all 0.2s ease;
+      }
+      .neu-btn:active {
+        box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light);
+      }
+
+      /* --- Soft CRT Effect --- */
+      .crt-overlay {
         position: relative;
         overflow: hidden;
-        border-radius: 12px;
-        box-shadow: inset 0 0 100px rgba(0,0,0,0.95);
-        perspective: 1000px;
       }
-      .screen-curve::before {
+      .crt-overlay::after {
         content: " ";
         display: block;
         position: absolute;
         top: 0; left: 0; bottom: 0; right: 0;
-        background: radial-gradient(circle, rgba(0,0,0,0) 55%, rgba(0,0,0,0.6) 100%);
-        z-index: 20;
-        pointer-events: none;
-      }
-
-      /* 2. Scanlines & Rolling Bar */
-      .crt-screen::after {
-        content: " ";
-        display: block;
-        position: absolute;
-        top: 0; left: 0; bottom: 0; right: 0;
-        background: linear-gradient(
-          to bottom,
-          rgba(18, 16, 16, 0) 50%,
-          rgba(0, 0, 0, 0.4) 50%
-        );
-        background-size: 100% 4px;
-        z-index: 21;
+        background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.05) 50%), linear-gradient(90deg, rgba(255,0,0,0.02), rgba(0,255,0,0.02), rgba(0,0,255,0.02));
+        background-size: 100% 3px, 3px 100%;
+        z-index: 2;
         pointer-events: none;
       }
       
@@ -99,13 +108,12 @@
         top: 0;
         left: 0;
         width: 100%;
-        height: 6px;
-        background: rgba(255, 255, 255, 0.15);
-        opacity: 0.6;
-        animation: scanline 8s linear infinite;
+        height: 100px;
+        background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.2), transparent);
+        opacity: 0.3;
+        animation: scanline 6s linear infinite;
         pointer-events: none;
-        z-index: 22;
-        box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+        z-index: 3;
       }
 
       @keyframes scanline {
@@ -113,46 +121,19 @@
         100% { top: 120%; }
       }
 
-      /* 3. Chromatic Aberration / Color Bleed */
-      @keyframes color-bleed-pulse {
-        0% { 
-          text-shadow: 2px 0px 1px rgba(255, 0, 0, 0.5), -2px 0px 1px rgba(0, 255, 255, 0.5);
-        }
-        50% { 
-          text-shadow: 3px 0px 1px rgba(255, 0, 0, 0.7), -3px 0px 1px rgba(0, 255, 255, 0.7);
-        }
-        100% { 
-          text-shadow: 2px 0px 1px rgba(255, 0, 0, 0.5), -2px 0px 1px rgba(0, 255, 255, 0.5);
-        }
-      }
-
-      .chromatic-text {
-        animation: color-bleed-pulse 4s infinite alternate;
-      }
-      
-      .acid-border {
-        border: 2px solid #e5e5e5;
-        box-shadow: 6px 6px 0px var(--acid-red);
-        background: #080808;
-      }
-      
-      .acid-text-shadow {
-        text-shadow: 3px 2px 0px var(--acid-red);
-      }
-
-      .pixelated {
-        image-rendering: pixelated;
-      }
-
       /* Custom Scrollbar */
       ::-webkit-scrollbar {
         width: 6px;
       }
       ::-webkit-scrollbar-track {
-        background: #000; 
+        background: transparent; 
       }
       ::-webkit-scrollbar-thumb {
-        background: var(--acid-red); 
+        background: #ccc; 
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #999; 
       }
     </style>
   <script type="importmap">
@@ -171,10 +152,9 @@
 }
 </script>
 </head>
-  <body class="bg-[#020202] text-gray-200 antialiased font-mono">
-    <!-- Visible overlay for fatal module load failures -->
-    <div id="startup-error" style="position:fixed; top:0; left:0; width:100%; height:100%; background:#0a0a0a; color:#ff4444; z-index:99999; padding:40px; white-space:pre-wrap; display:none; overflow:auto; font-family:monospace; border: 4px solid #ff4444;">
-      <h1 style="color: white; margin-bottom: 20px;">SYSTEM BOOT FAILURE</h1>
+  <body class="antialiased font-sans">
+    <div id="startup-error" style="position:fixed; top:0; left:0; width:100%; height:100%; background:#f0f0f0; color:#333; z-index:99999; padding:40px; white-space:pre-wrap; display:none; overflow:auto; font-family:sans-serif; border: 4px solid #999;">
+      <h1 style="color: #333; margin-bottom: 20px;">System Initialization Error</h1>
     </div>
     
     <div id="root"></div>
